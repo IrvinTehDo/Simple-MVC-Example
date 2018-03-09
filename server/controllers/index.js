@@ -3,6 +3,7 @@ const models = require('../models');
 
 // get the Cat model
 const Cat = models.Cat.CatModel;
+const Dog = models.Dog.DogModel;
 
 // default fake data so that we have something to work with until we make a real Cat
 const defaultData = {
@@ -68,6 +69,10 @@ const readCat = (req, res) => {
   Cat.findByName(name1, callback);
 };
 
+const readAllDogs = (req, res, callback) => {
+  Dog.find(callback);
+};
+
 // function to handle requests to the page1 page
 // controller functions in Express receive the full HTTP request
 // and a pre-filled out response object to send
@@ -110,6 +115,18 @@ const hostPage3 = (req, res) => {
     // actually calls index.jade. A second parameter of JSON can be passed
     // into the jade to be used as variables with #{varName}
   res.render('page3');
+};
+
+const hostPage4 = (req, res) => {
+  const callback = (err, docs) => {
+    if (err) {
+      return res.json({ err }); // if error, return it
+    }
+
+    // return success
+    return res.render('page4', { dogs: docs });
+  };
+  readAllDogs(req, res, callback);
 };
 
 // function to handle get request to send the name
@@ -161,7 +178,33 @@ const setName = (req, res) => {
   });
 
   // if error, return it
-  savePromise.catch((err) => res.json({ err }));
+  savePromise.catch((err) => { res.json({ err }); });
+
+  return res;
+};
+
+const setDog = (req, res) => {
+  if (!req.body.firstname || !req.body.lastname || !req.body.breed || !req.body.age) {
+    return res.status(400).json({ error: 'firstname,lastname, breed, and age are all required' });
+  }
+
+  const name = `${req.body.firstname} ${req.body.lastname}`;
+
+  const dogData = {
+    name,
+    breed: req.body.breed,
+    age: req.body.age,
+  };
+
+  const newDog = new Dog(dogData);
+
+  const savePromise = newDog.save();
+
+  savePromise.then(() => {
+    res.json({ name: newDog.name, breed: newDog.breed, age: newDog.age });
+  });
+
+  savePromise.catch((err) => { res.json({ err }); });
 
   return res;
 };
@@ -229,7 +272,34 @@ const updateLast = (req, res) => {
   savePromise.then(() => res.json({ name: lastAdded.name, beds: lastAdded.bedsOwned }));
 
   // if save error, just return an error for now
-  savePromise.catch((err) => res.json({ err }));
+  savePromise.catch(err => res.json({ err }));
+};
+
+const findAndUpdateAgeByName = (req, res) => {
+  if (!req.body.name) {
+    return res.status(400).json({ error: 'Dog name is required to perform a search' });
+  }
+
+  return Dog.findByName(req.body.name, (err, doc) => {
+    if (err) {
+      return res.json({ err });
+    }
+
+    if (!doc) {
+      return res.json({ error: `Could not find a dog with name ${req.body.name}` });
+    }
+
+    const dog = doc;
+    dog.age++;
+
+    const savePromise = dog.save();
+
+    savePromise.then(() => res.json({ name: dog.name, breed: dog.breed, age: dog.age }));
+
+    savePromise.catch(promiseErr => res.json({ promiseErr }));
+
+    return res;
+  });
 };
 
 // function to handle a request to any non-real resources (404)
@@ -253,10 +323,13 @@ module.exports = {
   page1: hostPage1,
   page2: hostPage2,
   page3: hostPage3,
+  page4: hostPage4,
   readCat,
   getName,
   setName,
   updateLast,
   searchName,
   notFound,
+  setDog,
+  findAndUpdateAgeByName,
 };
